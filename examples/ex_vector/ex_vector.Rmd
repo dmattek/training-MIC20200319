@@ -1,0 +1,118 @@
+---
+title: "Vectorisation"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::html_clean:
+    highlight: kate
+    code_folding: hide
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Intro
+
+To convert this notebook into HTML (to *knit* it), type `make` in the command line of this folder or click **Knit** icon in the top bar of the RStudio editor.
+
+R is a *high-level, interpreted* computer language. This means that R takes care of a lot of basic computer tasks for you.
+
+Most of R’s functions are vectorized, meaning that the function will operate on all elements of a vector without needing to loop through and act on each element one at a time. This makes writing code more concise, easy to read, and less error prone.
+
+# Adding two vectors in a loop
+
+Suppose we need to add 10M numbers to each other. This would be a *classical* way of doing it using a for loop:
+
+```{r, echo = T}
+nNum = 1e7
+vA = rnorm(nNum)
+vB = rnorm(nNum)
+vCloop = rep(0., nNum)
+
+system.time(
+  for(ii in 1:nNum) {
+    vCloop[ii] = vA[ii] + vB[ii]
+  }  
+)
+```
+
+Instead, R provides a convenient operator `+` that also works with vectors!
+
+```{r, echo = T}
+system.time({vCvec = vA + vB})
+```
+
+The result of two operations is exactly the same, but the latter is way faster!
+
+```{r, echo = T}
+all.equal(vCloop, vCvec)
+```
+
+```{r, echo=FALSE}
+# clean
+rm(nNum,
+   vA, vB, vCloop, vCvec)
+```
+
+# Inefficient for loop
+
+**However**, for loops can be fast **if** you follow some rules:
+
+1. Don’t use a loop when a vectorized alternative exists (see the previous slide).
+2. Don't increase the size of your objects, e.g. using `cbind`, `rbind`, during the loop! Instead, pre-allocate memory by predefining an object to hold the result. 
+
+Example of an inefficient loop: at every iteration of the loop, `myRes` increases in size because a new element is added to this vector.
+
+```{r, echo = T}
+nNum = 1e4
+vA = rnorm(nNum)
+vB = rnorm(nNum)
+
+myRes = c()
+system.time(
+  for(ii in 1:nNum) {
+    myRes = c(myRes, vA[ii] + vB[ii])
+  }  
+)
+```
+
+# Efficient for loop
+
+```{r, echo = T}
+# Pre-allocated vector where the result will be written to
+vC = rep(0., nNum)
+
+system.time(
+  for(ii in seq_along(vA)) {
+    vC[ii] = vA[ii] + vB[ii]
+  }  
+)
+```
+
+```{r, echo = T}
+all.equal(myRes, vC)
+```
+
+The result is the same, but pre-allocating the `vC` vector speeds up the computation by two orders of magnitude!
+
+The difference between the computation time increases with the size of the vector because without pre-allocating the memory, R is copying the existing vector before increasing its size with the `c` operation.
+
+```{r, echo = F}
+# Clean
+rm(nNum,
+   vA, vB, myRes, vC)
+```
+
