@@ -15,7 +15,7 @@ library(rmdformats)
 ## Global options
 options(max.print="75")
 opts_chunk$set(echo=FALSE,
-	             cache=FALSE,
+               cache=FALSE,
                prompt=FALSE,
                tidy=TRUE,
                comment=NA,
@@ -44,11 +44,11 @@ The microfluidic device has four separate channels, thus 4 different treatments 
 
 The PC-12 cells express a FRET biosensor to indicate activity of the ERK kinase.
 
-![FRET biosensor](presentation-images/pc12-biosensor.png)
+![FRET biosensor](../presentation-images/pc12-biosensor.png)
 
 ERK is an end point of the MAPK signalling pathway. 
 
-![MAPK pathway](presentation-images/mapk-scheme.png)
+![MAPK pathway](../presentation-images/mapk-scheme.png)
 
 Three different growth factors tested activate different parts of the MAPK network and result in different signalling dynamics, i.e. the behaviour of ERK activity over time. 
 
@@ -70,7 +70,7 @@ The folder `data` contains 3 sets of files that correspond to 3 growth factor tr
 - `Channel` an integer, 1-4, with the number of the microfluidic channel.
 - `Stim_Conc` a string with an indication of the GF concentration.
 
-![Data files](presentation-images/data-files.png)
+![Data files](../presentation-images/data-files.png)
 
 # Exercise 1: read data
 
@@ -94,7 +94,7 @@ head(dtEGF)
 
 The experimental description is located in this Excel file `../data/original/experimentDescription_EGFsust.xlsx`.
 
-Use `readxl::read_xlsx` function.
+Use the `readxl::read_xlsx` function.
 
 ```{r, echo = T, eval = F}
 require(readxl)
@@ -104,6 +104,78 @@ dtEGFexp = as.data.table(...)
 
 head(dtEGFexp)
 ```
+
+## Merge data with experimental description
+
+Add columns `Stim_Treat` and `Stim_Conc` with experiment description to single-cell data using `merge` function. Identify common columns between the two tables that will be used for merging. 
+
+```{r, echo = T, eval = F}
+dtEGFwithExp = merge(...)
+
+head(dtEGFwithExp)
+```
+
+## Read file list
+
+The table `dtEGFwithExp` created above contains single-cell data with treatment information (i.e. growth factor and its concentration) for a single growth factor only! Now, let's read all files in the `../data` folder corresponding to three growth factor treatments.
+
+1. Create a vector with raw file names in a folder
+
+```{r,echo=T, eval = F}
+vInFiles = list.files(path = ..., 
+                      pattern = ...,
+                      full.names = T)
+vInFiles
+```
+
+2. Apply an `fread` function to read individual files
+
+```{r,echo=T, eval = F}
+lAll = lapply(..., 
+              ...)
+```
+
+3. Name list elements according to file names they were read from. 
+
+These names will be converted to an ID column when binding the list with `rbindlist`.
+
+```{r,echo=T, eval = F}
+names(lAll) = vInFiles
+```
+
+4. Bind the list.
+
+Note that tables read from individual files have different column numbers. Therefore, when binding, we specify to option `use.names = T` to match column between different list elements, and `fill = T` to fill non-existing columns with NA`. 
+
+In addition, we use the option `idcol = "fileName"` to create a column that contains names of list elements that we assigned in the previous step.
+
+```{r,echo=T, eval = F}
+dtAll = rbindlist(lAll, 
+                  use.names = T, 
+                  fill = T, 
+                  idcol = "fileName")
+
+# Remove unnecessary columns; they exist only in 2 out of 3 of the files
+dtAll[,
+      c("Location_Center_X", 
+        "Location_Center_Y") := NULL]
+```
+
+5. Extract growth factor name from the `fileName` column.
+
+`gsub` is a handy function to extract strings using [regular expressions](https://cheatography.com/davechild/cheat-sheets/regular-expressions/).
+
+```{r,echo=T, eval = F}
+dtAll[,
+      c(lCol$treatGF) := gsub(..., 
+                              ..., 
+                              ...)]
+
+# remove the fileName column
+dtAll[...]
+```
+
+The `dtAll` table is still missing information about the growth factor concentration. To add that, we need to read `../data/original/experimentDescription_*` files.
 
 # Milestone 1
 
@@ -139,10 +211,13 @@ lCol = list(
 
 # Exercise 2: unique time series ID's
 
-Create a column with unique time series ID's. It will become quite handy later on... Use `paste`, `paste0`, or `sprintf` functions to concatenate strings from different columns.
+The track ID column is unique only within a single field of view, which is given in the `Metadata_Series` column.
+
+Create a column with unique time series ID's that includes the treatment, concentration, and track ID. It will become quite handy later on during subsetting and clustering. Use `paste`, `paste0`, or `sprintf` functions to concatenate strings from different columns.
 
 ```{r, echo = T, eval = F}
-dtAll[, (lCol$trackiduni) := ...]
+dtAll[, 
+      (lCol$trackiduni) := ...]
 
 head(dtAll)
 ```
@@ -155,41 +230,73 @@ summary(dtAll)
 
 ## Missing data
 
-```{r, echo = T, eval = T}
+To obtain rows with missing data in the `Intensity_MeanIntensity_Ratio` column, use `is.na` function. It returns `TRUE`, if the argument is `NA`.
+
+```{r, echo = T, eval = F}
 head(dtAll[is.na(get(lCol$meas))])
 ```
 
-Check measurements of a single time series
+Check measurements of a single time series. Note that the two operations on the data table have been *chained*, i.e. `dtAll[][]`. First, we selected all rows of `dtAll` which have the `TrackObjects_Label_Uni` column equal to `FGF_08_0001`, then we select `Intensity_MeanIntensity_Ratio` column from that result. The output is a vector.
 
 ```{r, echo = T, eval = F}
-dtAll[get(lCol$trackiduni) == "FGF_08_0001"][[lCol$meas]]
+head(
+  dtAll[get(lCol$trackiduni) == "FGF_08_0001"][[lCol$meas]]
+)
 ```
-
 
 Check the length of all other time series with NA's. 
 
+First, let's create a vector with `TrackObjects_Label_Uni` that contain `NA's` in the `Intensity_MeanIntensity_Ratio` column. Again, we're chaining data table operations.
+
 ```{r, echo = T, eval = F}
 # make a vector with strings of unique track ids of time series that contain NA's
-vsTracksWithNAs = dtAll[is.na(get(lCol$meas))][[lCol$trackiduni]]
-vsTracksWithNAs
+vsTracksWithNAs = unique(
+  dtAll[is.na(get(lCol$meas))][[lCol$trackiduni]])
 
+vsTracksWithNAs
+```
+
+The `unique` function takes only unique elements of its argument. This is to ensure that even if a single track contains multiple `NA's` we take its `TrackObjects_Label_Uni` only once.
+
+Second, we subset the `dtAll` to obtain rows where `TrackObjects_Label_Uni` belongs to elements of a `vsTracksWithNAs` vector.
+
+One option is to use `%in%` operator:
+
+```{r, echo = T, eval = F}
+head(
+  dtAll[get(lCol$trackiduni) %in% vsTracksWithNAs]
+)
+```
+
+Another, faster option is to set the key in `dtAll` to the `TrackObjects_Label_Uni` column:
+
+```{r, echo = T, eval = F}
 # Key the table according to a unique track ID
 setkeyv(dtAll, lCol$trackiduni)
 
-# calculate the number of time points of tracks with NA's
 head(
-  dtAll[vsTracksWithNAs, .N, by = c(lCol$trackiduni)], n = 12L)
+  dtAll[vsTracksWithNAs]
+)
 ```
 
+Finally we can calculate the number of time points in tracks with `NA's`.
+
+```{r, echo = T, eval = F}
+head(
+  dtAll[vsTracksWithNAs, 
+        .N, 
+        by = c(lCol$trackiduni)]
+)
+```
 
 # Exercise 3: identify missing data
 
-Calculate the number of time points per time series. Check the min and max. The `.N` calculates the number of rows, e.g.:
+Calculate the number of time points per time series. Check the min and max. The `.N` calculates the number of rows:
 
 ```{r, echo = T, eval = F}
 summary(
   dtAll[, ..., ...][["N"]]
-  )
+)
 ```
 
 Here, we chained two operations on a `data.table`. First, we calculated the number of rows per time series. This results in a new `data.table`. We then selected a single column named `N` from that table by using `[[...]]` syntax. 
@@ -209,21 +316,18 @@ dtAll = fread("../data/m2_allGF_wExpDescr_noNAs.csv.gz")
 head(dtAll)
 ```
 
-
-
 # Plot single-cell data
 
 ```{r,echo = T, message = F, fig.align='center', fig.width= 10, fig.height=8}
 require(ggplot2)
 p0 = ggplot(dtAll, 
-            aes_string(x = lCol$frame, y = lCol$meas, 
+            aes_string(x = lCol$frame, 
+                       y = lCol$meas, 
                        group = lCol$trackiduni)) +
   geom_path(alpha = 0.1) # parameter alpha adds transparency
 
 p0
 ```
-
-
 
 # Exercise 4A: remove point outliers
 
@@ -240,19 +344,17 @@ dtAll[,
       by = ...]
 ```
 
+Note, that interpolation has to be done independently by track. Doing that on a an entire column without grouping could result in interpolating the last `NA` of a track with a previous time point of that track and the first time point of the next track.
 
 # Exercise 4B: remove dynamics outliers
 
-Remove entire trajectories if the measurement is below **1000**. Create a vector with unique track ID's for time series that have measurements below the threshold. Subset `dtAll` using that vector and `%in` operator.
+Remove entire trajectories if at least a single time point is below **1000**. Create a vector with unique track ID's for time series that have measurements below the threshold. Subset `dtAll` using that vector and `%in%` operator, or subsetting a keyed `dtAll` as above.
 
 # Exercise 4B: remove dynamics outliers
 
 ```{r, echo = T, eval = F}
 # vector with unique track id's of time series where measurements were below a threshold of 1000
 vsTrackOut = unique(dtAll[...][[lCol$trackiduni]])
-
-# Key the table according to a unique track ID column; allows for quick and easy subsetting
-setkeyv(dtAll, lCol$trackiduni)
 
 # leave only tracks that are NOT in the outlier vector
 dtAll = dtAll[... %in% ...]
@@ -261,13 +363,23 @@ dtAll = dtAll[... %in% ...]
 rm(vsTrackOut)
 ```
 
+# Exercise 4C: plot cleaned dataset
+
+```{r,echo = T, eval = F, message = F, fig.align='center', fig.width= 10, fig.height=8}
+ggplot(dtAll, 
+       aes_string(x = ..., 
+                  y = ..., 
+                  group = ...)) +
+  geom_path(alpha = 0.1) # parameter alpha adds transparency
+```
+
 # Interactive removal of outliers
 
 There's no single recipe for handling outliers; it all depends on the analysis.
 
 A handy interactive tool written by Mauro Gwerder (a Bachelor student in Olivier Pertz lab) can help with that process. The R/Shiny app can be downloaded from [here](https://github.com/maurogwerder/Outlier_app) and executed from RStudio.
 
-![Outlier App GUI](presentation-images/gui-outlierapp.png)
+![Outlier App GUI](../presentation-images/gui-outlierapp.png)
 
 
 # Milestone 3
@@ -287,7 +399,7 @@ p0 = ggplot(dtAll, aes_string(x = lCol$frame,
                               y = lCol$meas, 
                               group = lCol$trackiduni)) +
   geom_path(alpha = 0.1) + # parameter alpha adds transparency 
-  facet_grid(reformulate(lCol$treatGF, lCol$treatConc))
+  facet_grid(get(lCol$treatGF) ~ get(lCol$treatConc))
 
 p0
 ```
@@ -318,6 +430,8 @@ dtAll[,
 
 # remove baseline column
 dtAll[, baseline := NULL]
+
+head(dtAll)
 ```
 
 # Milestone 4
@@ -345,12 +459,19 @@ p0
 
 # Add mean to the plot
 
+Note, that we are adding a layer with the summary to the existing ggplot!
+
 ```{r, echo = T, fig.align='center', fig.width= 10, fig.height=8}
 p1 = p0 +
   stat_summary(
-      aes_string(y = lCol$measNorm, group = 1),
-      fun.y = mean, geom = "line", group = 1,
-      colour = 'red', linetype = 'solid', size = 1)
+    aes_string(y = lCol$measNorm, 
+               group = 1),
+    fun = mean, 
+    geom = "line", 
+    group = 1,
+    colour = 'red', 
+    linetype = 'solid', 
+    size = 1)
 
 p1
 ```
@@ -390,7 +511,7 @@ require(plotly)
 
 Plot ERK activity at selected time points: baseline, peak, relaxation period. Visualise as box-, dot-, violin plots, or their combination.
 
-Use `%in` syntax to select rows, e.g.:
+Use `%in%` syntax to select rows from desired time points, e.g.:
 
 ```{r, echo = T, eval = F}
 dt[frame %in% c(10, 20, 30)]
@@ -408,14 +529,14 @@ geom_dotplot(binaxis = "y",
              binpositions = "all)
 ```
 
-For simplicity's sake, we will use `aes` instead of `aes_string`. Use explicit column names: `Metadata_T`, `Intensity_MeanIntensity_Ratio_Norm`.
+For simplicity's sake, we will use `aes` instead of `aes_string` and `get` to use column name strings. The argument for the x-axis has to be a categorical variable, which can be converted from the continuous variable by using the `as.factor()` function.
 
 ```{r, echo = T, eval = F, fig.align='center', fig.width= 10, fig.height=8}
 ggplot(dtAll[...], 
-       aes(x = ..., 
-           y = ...) +
+       aes(x = as.factor(get(lCol$frame)), 
+           y = ...)) +
   ... +
-  facet_grid(reformulate(lCol$treatGF, lCol$treatConc))
+  facet_grid(get(lCol$treatGF) ~ get(lCol$treatConc)) +
 ```
 
 
@@ -430,8 +551,8 @@ In the **wide** format, every row corresponds to a whole single time series; col
 ```{r, echo = T, eval = F}
 # Conversion from long to wide format
 dtAllWide = data.table::dcast(dtAll, 
-                  ... ~ ..., # place for the formula; LHS - row variable, RHS - column variable
-                  value.var = '...') # place for the column name that will be cast into columns
+                              ... ~ ..., # place for the formula; LHS - row variable, RHS - column variable
+                              value.var = '...') # place for the column name that will be cast into columns
 
 # obtain row names for later
 vsRowNames = dtAllWide[[lCol$trackiduni]]
@@ -456,7 +577,7 @@ head(mAllWide)
 
 There many methods to calculate the distance, e.g. [Euclidean](https://en.wikipedia.org/wiki/Euclidean_distance) or [Manhattan](https://en.wikipedia.org/wiki/Taxicab_geometry) distances where where time points are treated independently, or shape-based distances such as [Dynamic Time Warping](https://en.wikipedia.org/wiki/Dynamic_time_warping).
 
-A very convenient way to visualise clustering of time series is a heatmap with a dendrogram. Use a base-R `heatmap` function to perform hierarchical clustering and to display the result as a heatmap.
+A very convenient way to cluster AND to visualise clustering of time series is a heatmap with a dendrogram. Use a base-R `heatmap` function to perform hierarchical clustering and to display the result as a heatmap.
 
 ```{r, echo = T, eval = F, message = F, fig.align='center', fig.width= 8, fig.height=8}
 heatmap(mAllWide)
@@ -545,8 +666,8 @@ str(clTree)
 Cut the dendrogram at a desired level. Here, we cut it at 6. Play with that value...
 
 ```{r, echo = T, eval = F}
-clAssign = dendextend::cutree(clTree, k = 6)
-head(clAssign, 20)
+clAssign = dendextend::cutree(clTree, k = 6L)
+head(clAssign, 20L)
 ```
 
 Convert named vector to a data table.
@@ -559,7 +680,7 @@ head(dtClAssign)
 
 ## Step 3: Merge 
 
-Merge the original time series with cluster assignments for individual time series.
+Merge the original time series with cluster assignments for individual time series. This way, we'll have a cluster number assigned to every time series in th elong format.
 
 ```{r, echo = T, eval = F}
 dtAllCl = merge(dtAll, 
@@ -585,8 +706,7 @@ dtAllCl[, (lCol$clid) := as.factor(get(lCol$clid))]
 
 # Exercise 9: plot time series per cluster
 
-Plot time series in each cluster, include the population mean. Use faceting per cluster.
-
+Plot single-cell time series in each cluster, include the population mean. Use faceting per cluster.
 
 ```{r, echo = T, eval = F, fig.align='center', fig.width= 10, fig.height=5}
 ggplot(dtAllCl, 
@@ -595,11 +715,11 @@ ggplot(dtAllCl,
                   group = lCol$trackiduni)) +
   geom_path(alpha = 0.1) +
   stat_summary(
-      aes_string(y = lCol$measNorm, group = 1),
-      fun.y = ..., # place for a function to calculate the summary
-      geom = "line", group = 1,
-      colour = 'red', linetype = 'solid', size = 1) +
-  facet_wrap(...) + # place for a faceting variable
+    aes_string(y = lCol$measNorm, group = 1),
+    fun.y = ..., # place for a function to calculate the summary
+    geom = "line", group = 1,
+    colour = 'red', linetype = 'solid', size = 1) +
+  facet_grid(...) + # place for a faceting variable
   theme_minimal() +
   labs(title = "Clusters of ERK activity dynamic responses",
        caption = paste0("Created on ", Sys.Date())) +
@@ -610,14 +730,11 @@ ggplot(dtAllCl,
 
 # Exercise 10: contribution of clusters per condition 
 
-Calculate and plot the composition of experimental conditions with respect to clusters. Perform data aggregation to calculate the number of time series per group, per cluster. The short-cut to calculate the number of rows in `data.table` is `.N`, e.g.
+Calculate and plot the composition of experimental conditions with respect to clusters. Perform data aggregation to calculate the number of time series per group, per cluster.
 
-```{r, echo = T, eval = F}
-dt[, .(nTimeSer = .N), by = group]
-```
+**Hint**, the number of time series in `dtAllCl` is the number of unique `TrackObjects_Label_Uni` per group.
 
-
-Aggregate and assign the result to a new data table `dtAllClN`:
+Aggregate and assign the result to a new `data.table` `dtAllClN`:
 
 ```{r, echo = T, eval = F}
 dtAllClN = dtAllCl[, 
@@ -641,7 +758,7 @@ p5 = ggplot(dtAllClN, aes_string(x = ..., # places for x and y variables
 # Facetting per growth factor
 p5 = p5 +
   facet_wrap(...)
-  
+
 # Stacked bar plot with bars coloured by cluster number
 # Bars are stretched to "fill" the y-axis using the option position = position_fill()
 p5 = p5 +
@@ -657,8 +774,8 @@ p5 = p5 +
 p5 = p5 +
   scale_fill_manual("GF:", 
                     values = ggthemes::tableau_color_pal("Color Blind")(6))
-  
-# Prettify the plot; add labels, etc
+
+# Prettify the plot; add labels, etc.
 p5 = p5 +
   theme_minimal() +
   labs(title = "Participation of clusters in experimental conditions",
@@ -697,12 +814,22 @@ rm(vsRowNames, dtAllWide)
 
 ## Optimal number of clusters - Silhouette method
 
+[Silhouette](https://en.wikipedia.org/wiki/Silhouette_(clustering)) is a method of interpretation and validation of consistency within clusters of data.
+
+The silhouette value is a measure of how similar an object is to its own cluster (cohesion) compared to other clusters (separation). The silhouette ranges from −1 to +1, where a high value indicates that the object is well matched to its own cluster and poorly matched to neighbouring clusters. If most objects have a high value, then the clustering configuration is appropriate. If many points have a low or negative value, then the clustering configuration may have too many or too few clusters.
+
+The `factoextra::fviz_nbclust` calculates the average silhouette of N Monte Carlo samples for a range of cluster numbers.
+
 ```{r, echo = T, message = F, fig.align='center'}
 require(factoextra)
 
-# Silhouette method
-factoextra::fviz_nbclust(mAllWide, hcut, method = "silhouette") +
-  labs(subtitle = "Silhouette method")
+# Silhouette method computed with euclidean distance
+factoextra::fviz_nbclust(mAllWide, 
+                         k.max = 10, 
+                         nboot = 100,
+                         FUNcluster = hcut, 
+                         method = "silhouette") +
+  labs(subtitle = "Silhouette method - euclidean distance")
 
 ```
 
@@ -714,15 +841,19 @@ factoextra::fviz_nbclust(mAllWide, hcut, method = "silhouette") +
 # nboot = 10 to keep the function speedy. 
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
+
 set.seed(123)
-factoextra::fviz_nbclust(mAllWide, hcut, method = "gap_stat",
-                         nstart = 25, nboot = 10)+
+factoextra::fviz_nbclust(mAllWide, 
+                         FUNcluster = hcut, 
+                         method = "gap_stat",
+                         nstart = 25, 
+                         nboot = 10) +
   labs(subtitle = "Gap statistic method")
 ```
 
 ## 30 indices
 
-We’ll use the package `NbClust` which will compute, with a single function call, 30 indices for deciding the right number of clusters in the dataset:
+We’ll use the package `NbClust` to compute, with a single function call, 30 indices for deciding the right number of clusters in the dataset:
 
 ```{r, echo = T, message = F, cache.lazy=T}
 require(NbClust)
@@ -764,4 +895,4 @@ factoextra::fviz_silhouette(hc.res)
 
 A free R/Shiny app developed in Olivier Pertz lab available from [here](https://github.com/dmattek/shiny-timecourse-inspector).
 
-![TCI App GUI](presentation-images/gui-tci.png)
+![TCI App GUI](../presentation-images/gui-tci.png)

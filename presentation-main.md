@@ -1367,7 +1367,7 @@ system.time(
 
 ```
    user  system elapsed 
-  0.071   0.041   0.210 
+  0.068   0.034   0.146 
 ```
 
 
@@ -1524,7 +1524,7 @@ system.time(
 
 ```
    user  system elapsed 
-  1.131   0.032   1.257 
+  1.509   0.060   4.338 
 ```
 
 ---
@@ -1538,7 +1538,7 @@ system.time({vCvec = vA + vB})
 
 ```
    user  system elapsed 
-  0.038   0.001   0.040 
+  0.037   0.001   0.053 
 ```
 
 The result of two operations is exactly the same, but the latter is way faster!
@@ -1554,6 +1554,7 @@ all.equal(vCloop, vCvec)
 
 
 
+[R notebook](examples/ex_vector/ex_vector.html) with this example.
 
 Avoid for loops?
 =================
@@ -1585,7 +1586,7 @@ system.time(
 
 ```
    user  system elapsed 
-  0.268   0.177   0.448 
+  0.253   0.216   0.487 
 ```
 
 For loops (2)
@@ -1605,7 +1606,7 @@ system.time(
 
 ```
    user  system elapsed 
-  0.004   0.001   0.004 
+  0.007   0.000   0.007 
 ```
 
 

@@ -1354,6 +1354,7 @@ rm(nNum,
    vA, vB, vCloop, vCvec)
 ```
 
+[R notebook](examples/ex_vector/ex_vector.html) with this example.
 
 Avoid for loops?
 =================

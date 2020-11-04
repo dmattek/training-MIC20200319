@@ -1,13 +1,19 @@
 #!/usr/bin/env Rscript
 
-## Load librares ----
+## Load libraries ----
 library(optparse)
 
 ## Process command-line parameters ----
 option_list = list(
-  optparse::make_option(c("-r", "--rootdir"), type="character", default=NULL, 
-                        help="full path to root directory", metavar="character"),
-  optparse::make_option(c("-d", "--debug"), action="store_true", default = FALSE, dest = 'debug', 
+  optparse::make_option(c("-r", "--rootdir"), 
+                        type="character", 
+                        default=NULL, 
+                        help="full path to root directory", 
+                        metavar="character"),
+  optparse::make_option(c("-d", "--debug"), 
+                        action="store_true", 
+                        default = FALSE, 
+                        dest = 'debug', 
                         help="Print extra output")
 ); 
 

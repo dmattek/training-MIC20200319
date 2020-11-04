@@ -55,7 +55,8 @@ dtBabies[gender == 'M']
 Select specific variables/columns:
 
 ```{r, echo = T}
-dtBabies[, .(name, gender, year2015)]
+dtBabies[, 
+         .(name, gender, year2015)]
 ```
 Calculate the mean of a single column:
 
@@ -110,7 +111,9 @@ To select specific columns we can provide them this way:
 
 ```{r, echo = T}
 myColumns = c(lCol$group[[1]], lCol$timeLast)
-dtBabies[, myColumns, with = F]
+dtBabies[, 
+         myColumns, 
+         with = F]
 ```
 Or simpler (note the double dot):
 
@@ -133,6 +136,14 @@ Provide the names of **identification** (`id.vars`) and **measure** variables (`
 
 The original data frame contains missing values; `na.rm=T` omits them in the long-format table.
 
+```{r}
+dtBabiesLong = data.table::melt(dtBabies, 
+                                id.vars = c('name', 'gender'), 
+                                measure.vars = 3:7)
+head(dtBabiesLong, 5L)
+```
+
+
 ```{r, echo = T}
 dtBabiesLong = data.table::melt(dtBabies, 
                                 id.vars = c('name', 'gender'), 
@@ -140,7 +151,7 @@ dtBabiesLong = data.table::melt(dtBabies,
                                 variable.name = 'year', 
                                 value.name = 'weight',
                                 na.rm = T)
-head(dtBabiesLong, n = 5L)
+dtBabiesLong
 ```
 
 # Long to wide
@@ -240,7 +251,18 @@ ggplot2::ggplot(dtBabiesLong,
   geom_point()
 ```
 
-In order to produce facets per `gender`, we use function `facet_wrap`. 
+To colour lines by gender, set the `color` column aesthetics in `geom_line` to follow `gender`:
+
+```{r, echo = T}
+ggplot2::ggplot(dtBabiesLong, 
+                aes_string(x = lCol$time, 
+                           y = lCol$meas, 
+                           group = lCol$group[1])) +
+  geom_line(aes_string(color = lCol$group[2])) +
+  geom_point()
+```
+
+In order to produce facets per `gender`, use the `facet_wrap` function:
 
 ```{r, echo = T}
 ggplot2::ggplot(dtBabiesLong, 
@@ -262,7 +284,7 @@ ggplot2::ggplot(dtBabiesLong,
   geom_point() +
   facet_wrap(lCol$group[2]) +
   stat_summary(fun = mean, 
-               aes(group=1), 
+               aes(group=1),
                geom = "line", 
                colour = 'red')
 ```
@@ -286,7 +308,7 @@ Extract numerical value from the `year` column and assign it to a `yearNum` colu
 
 ```{r, echo = T}
 dtBabiesLong[,
-             yearNum := as.numeric(gsub("year", "", get(lCol$time)))]
+             yearNum := as.integer(gsub("year", "", get(lCol$time)))]
 ```
 
 ```{r, echo = T}
